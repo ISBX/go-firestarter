@@ -20,11 +20,11 @@ package mockfs
 // A simple mock server.
 
 import (
+	"encoding/json"
 	"fmt"
-	"sort"
+	"os"
+	"sync"
 
-	"github.com/golang/protobuf/proto"
-	errors "github.com/weathersource/go-errors"
 	gsrv "github.com/weathersource/go-gsrv"
 	pb "google.golang.org/genproto/googleapis/firestore/v1"
 )
@@ -33,14 +33,11 @@ import (
 // (https://godoc.org/google.golang.org/genproto/googleapis/firestore/v1beta1#FirestoreServer)
 type MockServer struct {
 	pb.FirestoreServer
-	Addr     string
-	reqItems []reqItem
-	resps    []interface{}
-}
+	Addr string
 
-type reqItem struct {
-	wantReq proto.Message
-	adjust  func(gotReq proto.Message)
+	srv      *gsrv.Server
+	data     map[string]collection
+	dataLock sync.RWMutex
 }
 
 func newServer() (*MockServer, error) {
@@ -48,7 +45,12 @@ func newServer() (*MockServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	mock := &MockServer{Addr: srv.Addr}
+	mock := &MockServer{
+		Addr: srv.Addr,
+
+		srv:  srv,
+		data: map[string]collection{},
+	}
 	pb.RegisterFirestoreServer(srv.Gsrv, mock)
 	srv.Start()
 	return mock, nil
@@ -56,72 +58,43 @@ func newServer() (*MockServer, error) {
 
 // Reset returns the MockServer to an empty state.
 func (s *MockServer) Reset() {
-	s.reqItems = nil
-	s.resps = nil
+	s.dataLock.Lock()
+	s.data = map[string]collection{}
+	s.dataLock.Unlock()
 }
 
-// AddRPC adds a (request, response) pair to the server's list of expected
-// interactions. The server will compare the incoming request with wantReq
-// using proto.Equal. The response can be a message or an error.
-//
-// For the Listen RPC, resp should be a []interface{}, where each element
-// is either ListenResponse or an error.
-//
-// Passing nil for wantReq disables the request check.
-func (s *MockServer) AddRPC(wantReq proto.Message, resp interface{}) {
-	s.AddRPCAdjust(wantReq, resp, nil)
+func (s *MockServer) Close() {
+	s.srv.Close()
 }
 
-// AddRPCAdjust is like AddRPC, but accepts a function that can be used
-// to tweak the requests before comparison, for example to adjust for
-// randomness.
-func (s *MockServer) AddRPCAdjust(wantReq proto.Message, resp interface{}, adjust func(gotReq proto.Message)) {
-	s.reqItems = append(s.reqItems, reqItem{wantReq, adjust})
-	s.resps = append(s.resps, resp)
-}
-
-// popRPC compares the request with the next expected (request, response) pair.
-// It returns the response, or an error if the request doesn't match what
-// was expected or there are no expected rpcs.
-func (s *MockServer) popRPC(gotReq proto.Message) (interface{}, error) {
-	if len(s.reqItems) == 0 || len(s.resps) == 0 {
-		panic("mockfs.popRPC: Out of RPCs.")
+// LoadFromFile loads a JSON file into the MockServer.
+func (s *MockServer) LoadFromJSONFile(filePath string) error {
+	jsonBytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return err
 	}
-	ri := s.reqItems[0]
-	resp := s.resps[0]
-	s.reqItems = s.reqItems[1:]
-	s.resps = s.resps[1:]
-	if ri.wantReq != nil {
-		if ri.adjust != nil {
-			ri.adjust(gotReq)
+
+	jsonMap := make(map[string]interface{})
+	err = json.Unmarshal(jsonBytes, &jsonMap)
+	if err != nil {
+		return err
+	}
+
+	s.dataLock.Lock()
+	defer s.dataLock.Unlock()
+
+	for collectionName, collectionData := range jsonMap {
+		data, ok := collectionData.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("collection %v data is not a map: %v", collectionName, collectionData)
+		}
+		collection, err := parseCollection(collectionName, data)
+		if err != nil {
+			return err
 		}
 
-		// Sort FieldTransforms by FieldPath, since slice order is undefined and proto.Equal
-		// is strict about order.
-		switch gotReqTyped := gotReq.(type) {
-		case *pb.CommitRequest:
-			for _, w := range gotReqTyped.Writes {
-				switch opTyped := w.Operation.(type) {
-				case *pb.Write_Transform:
-					sort.Sort(byFieldPath(opTyped.Transform.FieldTransforms))
-				}
-			}
-		}
+		s.data[collectionName] = *collection
+	}
 
-		if !proto.Equal(gotReq, ri.wantReq) {
-			return nil, errors.NewInternalError(fmt.Sprintf("mockfs.popRPC: Bad request\ngot:  %T\n%s\nwant: %T\n%s",
-				gotReq, proto.MarshalTextString(gotReq),
-				ri.wantReq, proto.MarshalTextString(ri.wantReq)))
-		}
-	}
-	if err, ok := resp.(error); ok {
-		return nil, err
-	}
-	return resp, nil
+	return nil
 }
-
-type byFieldPath []*pb.DocumentTransform_FieldTransform
-
-func (a byFieldPath) Len() int           { return len(a) }
-func (a byFieldPath) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byFieldPath) Less(i, j int) bool { return a[i].FieldPath < a[j].FieldPath }
