@@ -7,6 +7,7 @@ package mockfs
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	pb "google.golang.org/genproto/googleapis/firestore/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -32,6 +33,8 @@ func valueToProtoValue(value interface{}) *pb.Value {
 		return &pb.Value{ValueType: &pb.Value_DoubleValue{DoubleValue: v}}
 	case bool:
 		return &pb.Value{ValueType: &pb.Value_BooleanValue{BooleanValue: v}}
+	case time.Time:
+		return &pb.Value{ValueType: &pb.Value_TimestampValue{TimestampValue: timestamppb.New(v)}}
 	case map[string]interface{}:
 		return &pb.Value{ValueType: &pb.Value_MapValue{MapValue: &pb.MapValue{Fields: mapToFields(v)}}}
 	case []interface{}:
@@ -54,7 +57,6 @@ func mapToFields(mapvals map[string]interface{}) map[string]*pb.Value {
 }
 
 func pbMapToMap(mapvals map[string]*pb.Value) map[string]interface{} {
-	// TODO timestamp?
 	fields := map[string]interface{}{}
 	for key, value := range mapvals {
 		switch v := value.GetValueType().(type) {
@@ -66,6 +68,8 @@ func pbMapToMap(mapvals map[string]*pb.Value) map[string]interface{} {
 			fields[key] = v.DoubleValue
 		case *pb.Value_BooleanValue:
 			fields[key] = v.BooleanValue
+		case *pb.Value_TimestampValue:
+			fields[key] = v.TimestampValue.AsTime()
 		case *pb.Value_MapValue:
 			fields[key] = pbMapToMap(v.MapValue.Fields)
 		}
@@ -111,8 +115,7 @@ func (d *Document) SetWithValue(name string, value *pb.Value) {
 	case *pb.Value_DoubleValue:
 		d.fields[name] = value.DoubleValue
 	case *pb.Value_TimestampValue:
-		// TODO
-		d.fields[name] = value.TimestampValue
+		d.fields[name] = value.TimestampValue.AsTime()
 	case *pb.Value_StringValue:
 		d.fields[name] = value.StringValue
 	case *pb.Value_BooleanValue:
@@ -173,6 +176,13 @@ func parseDocument(path string, documentData map[string]interface{}) (*Document,
 				newDoc.subcollections[collectionName] = *newCollection
 			}
 		} else {
+			// if string is a RFC3339 timestamp, convert it to a time.Time
+			if str, ok := value.(string); ok {
+				t, err := time.Parse(time.RFC3339, str)
+				if err == nil {
+					value = t
+				}
+			}
 			newDoc.fields[key] = value
 		}
 	}

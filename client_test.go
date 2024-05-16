@@ -3,6 +3,7 @@ package mockfs
 import (
 	"context"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/stretchr/testify/assert"
@@ -97,6 +98,22 @@ func TestClientOrderBy(t *testing.T) {
 
 	// test number field asc
 	docSnaps, err = client.Collection("collection-1").OrderBy("field3", firestore.Asc).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+	assert.Equal(t, "document-1-1", docSnaps[0].Ref.ID)
+	assert.Equal(t, "document-1-2", docSnaps[1].Ref.ID)
+
+	// test timestamp field desc
+	docSnaps, err = client.Collection("collection-1").OrderBy("field8", firestore.Desc).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+	assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
+	assert.Equal(t, "document-1-1", docSnaps[1].Ref.ID)
+
+	// test timestamp field asc
+	docSnaps, err = client.Collection("collection-1").OrderBy("field8", firestore.Asc).Documents(ctx).GetAll()
 	assert.Nil(t, err)
 
 	assert.Len(t, docSnaps, 2)
@@ -440,6 +457,92 @@ func TestClientWhere_bool(t *testing.T) {
 	assert.Len(t, docSnaps, 2)
 }
 
+func TestClientWhere_timestamp(t *testing.T) {
+	ctx := context.Background()
+	client, srv, err := New()
+	assert.Nil(t, err)
+	defer srv.Close()
+
+	srv.LoadFromJSONFile("test.json")
+
+	jan1, _ := time.Parse(time.RFC3339, "2001-01-01T00:00:00Z")
+	feb1, _ := time.Parse(time.RFC3339, "2001-02-01T00:00:00Z")
+
+	// test ==
+	docSnaps, err := client.Collection("collection-1").Where("field8", "==", jan1).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-1", docSnaps[0].Ref.ID)
+
+	// test <
+	docSnaps, err = client.Collection("collection-1").Where("field8", "<", feb1).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-1", docSnaps[0].Ref.ID)
+
+	// test <=
+	docSnaps, err = client.Collection("collection-1").Where("field8", "<=", feb1).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+
+	// test >
+	docSnaps, err = client.Collection("collection-1").Where("field8", ">", jan1).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
+
+	// test >=
+	docSnaps, err = client.Collection("collection-1").Where("field8", ">=", jan1).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+
+	// test !=
+	docSnaps, err = client.Collection("collection-1").Where("field8", "!=", jan1).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
+
+	// test in
+	docSnaps, err = client.Collection("collection-1").Where("field8", "in", []time.Time{jan1, feb1}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+
+	docSnaps, err = client.Collection("collection-1").Where("field8", "in", []time.Time{jan1, time.Now()}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-1", docSnaps[0].Ref.ID)
+
+	docSnaps, err = client.Collection("collection-1").Where("field8", "in", []time.Time{}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 0)
+
+	// test not-in
+	docSnaps, err = client.Collection("collection-1").Where("field8", "not-in", []time.Time{jan1, feb1}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 0)
+
+	docSnaps, err = client.Collection("collection-1").Where("field8", "not-in", []time.Time{jan1, time.Now()}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
+
+	docSnaps, err = client.Collection("collection-1").Where("field8", "not-in", []time.Time{}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+}
+
 func TestClientWhere_array(t *testing.T) {
 	ctx := context.Background()
 	client, srv, err := New()
@@ -589,6 +692,8 @@ func TestClientSet(t *testing.T) {
 	assert.Nil(t, err)
 	defer srv.Close()
 
+	jan1, _ := time.Parse(time.RFC3339, "2001-01-01T00:00:00Z")
+
 	// create a new doc
 	docRef := client.Doc("collection-1/document-1-1")
 	_, err = docRef.Set(ctx, map[string]interface{}{
@@ -598,6 +703,7 @@ func TestClientSet(t *testing.T) {
 			"subfield1": "new-subvalue-1-1-1-1",
 			"subfield2": "new-subvalue-1-1-1-2",
 		},
+		"field8": jan1,
 	})
 	assert.Nil(t, err)
 
@@ -611,6 +717,7 @@ func TestClientSet(t *testing.T) {
 		"subfield1": "new-subvalue-1-1-1-1",
 		"subfield2": "new-subvalue-1-1-1-2",
 	}, docData["field7"])
+	assert.Equal(t, jan1, docData["field8"])
 }
 
 func TestClientUpdate(t *testing.T) {

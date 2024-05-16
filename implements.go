@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	pb "google.golang.org/genproto/googleapis/firestore/v1"
 	empty "google.golang.org/protobuf/types/known/emptypb"
@@ -277,6 +278,8 @@ func lessThan(a Document, b Document, field string, direction pb.StructuredQuery
 		case bool:
 			// false < true
 			return !aval.(bool) && bval.(bool)
+		case time.Time:
+			return aval.(time.Time).Before(bval.(time.Time))
 		}
 		return false
 	} else if direction == pb.StructuredQuery_DESCENDING {
@@ -290,6 +293,8 @@ func lessThan(a Document, b Document, field string, direction pb.StructuredQuery
 		case bool:
 			// true < false
 			return aval.(bool) && !bval.(bool)
+		case time.Time:
+			return aval.(time.Time).After(bval.(time.Time))
 		}
 		return false
 	}

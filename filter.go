@@ -1,6 +1,8 @@
 package mockfs
 
 import (
+	"time"
+
 	pb "google.golang.org/genproto/googleapis/firestore/v1"
 )
 
@@ -69,7 +71,7 @@ func matchFieldFilter(doc Document, filter *pb.StructuredQuery_FieldFilter) bool
 }
 
 func matchValue(value interface{}, op pb.StructuredQuery_FieldFilter_Operator, filterValue *pb.Value) bool {
-	// TODO timestamp?
+	// TODO maps
 	switch v := value.(type) {
 	case string:
 		return matchStringValue(v, op, filterValue)
@@ -79,6 +81,8 @@ func matchValue(value interface{}, op pb.StructuredQuery_FieldFilter_Operator, f
 		return matchNumberValue(v, op, filterValue)
 	case bool:
 		return matchBoolValue(v, op, filterValue)
+	case time.Time:
+		return matchTimeValue(v, op, filterValue)
 	case []interface{}:
 		return matchArrayValue(v, op, filterValue)
 	}
@@ -226,6 +230,37 @@ func matchBoolValue(value bool, op pb.StructuredQuery_FieldFilter_Operator, filt
 	case pb.StructuredQuery_FieldFilter_NOT_IN:
 		for _, ref := range filterValue.GetArrayValue().Values {
 			if value == ref.GetBooleanValue() {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+func matchTimeValue(value time.Time, op pb.StructuredQuery_FieldFilter_Operator, filterValue *pb.Value) bool {
+	switch op {
+	case pb.StructuredQuery_FieldFilter_EQUAL:
+		return value.Equal(filterValue.GetTimestampValue().AsTime())
+	case pb.StructuredQuery_FieldFilter_LESS_THAN:
+		return value.Before(filterValue.GetTimestampValue().AsTime())
+	case pb.StructuredQuery_FieldFilter_LESS_THAN_OR_EQUAL:
+		return value.Before(filterValue.GetTimestampValue().AsTime()) || value.Equal(filterValue.GetTimestampValue().AsTime())
+	case pb.StructuredQuery_FieldFilter_GREATER_THAN:
+		return value.After(filterValue.GetTimestampValue().AsTime())
+	case pb.StructuredQuery_FieldFilter_GREATER_THAN_OR_EQUAL:
+		return value.After(filterValue.GetTimestampValue().AsTime()) || value.Equal(filterValue.GetTimestampValue().AsTime())
+	case pb.StructuredQuery_FieldFilter_NOT_EQUAL:
+		return !value.Equal(filterValue.GetTimestampValue().AsTime())
+	case pb.StructuredQuery_FieldFilter_IN:
+		for _, ref := range filterValue.GetArrayValue().Values {
+			if value.Equal(ref.GetTimestampValue().AsTime()) {
+				return true
+			}
+		}
+	case pb.StructuredQuery_FieldFilter_NOT_IN:
+		for _, ref := range filterValue.GetArrayValue().Values {
+			if value.Equal(ref.GetTimestampValue().AsTime()) {
 				return false
 			}
 		}
