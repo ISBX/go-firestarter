@@ -21,6 +21,7 @@ package mockfs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -29,6 +30,8 @@ import (
 	empty "google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+var ErrDocumentNotFound = fmt.Errorf("document not found")
 
 func getDocumentPath(fullPath string) string {
 	// `projects/{project_id}/databases/{database_id}/documents/{document_path}`.
@@ -65,7 +68,7 @@ func (s *MockServer) getDocumentByPath(path string) (*document, error) {
 		}
 		document, ok = collection.documents[documentId]
 		if !ok {
-			return nil, fmt.Errorf("document not found: %s", documentId)
+			return nil, ErrDocumentNotFound
 		}
 	}
 
@@ -107,10 +110,11 @@ func (s *MockServer) GetDocument(ctx context.Context, req *pb.GetDocumentRequest
 	// not sure when/if this is actually called?
 	// client.Doc("collection-1/document-1-1").Get(ctx) seems to use BatchGetDocuments
 
-	// `projects/{project_id}/databases/{database_id}/documents/{document_path}`.
-	path := getDocumentPath(req.GetName())
 	s.dataLock.RLock()
 	defer s.dataLock.RUnlock()
+
+	// `projects/{project_id}/databases/{database_id}/documents/{document_path}`.
+	path := getDocumentPath(req.GetName())
 	document, err := s.getDocumentByPath(path)
 	if err != nil {
 		return nil, err
@@ -122,8 +126,61 @@ func (s *MockServer) GetDocument(ctx context.Context, req *pb.GetDocumentRequest
 // Commit overrides the FirestoreServer Commit method
 func (s *MockServer) Commit(ctx context.Context, req *pb.CommitRequest) (*pb.CommitResponse, error) {
 	fmt.Println("Commit") // used for Set?
-	// TODO
-	return nil, nil
+	s.dataLock.Lock()
+	defer s.dataLock.Unlock()
+
+	writes := req.GetWrites()
+
+	responses := []*pb.WriteResult{}
+
+	for _, write := range writes {
+		path := getDocumentPath(write.GetUpdate().Name)
+
+		fmt.Println("write", write)
+
+		doc, err := s.getDocumentByPath(path)
+		if err != nil {
+			fmt.Println("err", err)
+			if errors.Is(err, ErrDocumentNotFound) {
+				// if updating a document, then return error if document doesn't exist
+				if write.GetCurrentDocument().GetExists() {
+					return nil, err
+				}
+				doc = &document{
+					name:           path,
+					subcollections: map[string]collection{},
+					fields:         map[string]interface{}{},
+				}
+
+				// TODO add to parent collection
+			} else {
+				// TODO precondition failed error
+				return &pb.CommitResponse{}, err
+			}
+		}
+		fmt.Println(doc)
+
+		updateMask := write.GetUpdateMask().GetFieldPaths()
+		fmt.Println("updateMask", updateMask)
+		updateFields := write.GetUpdate().GetFields()
+		if len(updateMask) == 0 {
+			for field, value := range updateFields {
+				doc.SetWithValue(field, value)
+			}
+		} else {
+			for _, field := range updateMask {
+				fmt.Println("updating", field, updateFields[field])
+				doc.SetWithValue(field, updateFields[field])
+			}
+		}
+		responses = append(responses, &pb.WriteResult{
+			UpdateTime: timestamppb.Now(),
+		})
+	}
+
+	return &pb.CommitResponse{
+		WriteResults: responses,
+	}, nil
 }
 
 // BatchGetDocuments overrides the FirestoreServer BatchGetDocuments method
@@ -161,6 +218,8 @@ func (s *MockServer) BatchGetDocuments(req *pb.BatchGetDocumentsRequest, bs pb.F
 }
 
 func lessThan(a document, b document, field string, direction pb.StructuredQuery_Direction) bool {
+	// TODO support Arrays, Map (existing types)
+	// https://firebase.google.com/docs/firestore/manage-data/data-types#data_types
 	aval := a.Get(field)
 	bval := b.Get(field)
 	if direction == pb.StructuredQuery_ASCENDING {
@@ -171,6 +230,9 @@ func lessThan(a document, b document, field string, direction pb.StructuredQuery
 			return aval.(int) < bval.(int)
 		case float64:
 			return aval.(float64) < bval.(float64)
+		case bool:
+			// false < true
+			return !aval.(bool) && bval.(bool)
 		}
 		return false
 	} else if direction == pb.StructuredQuery_DESCENDING {
@@ -181,6 +243,9 @@ func lessThan(a document, b document, field string, direction pb.StructuredQuery
 			return aval.(int) > bval.(int)
 		case float64:
 			return aval.(float64) > bval.(float64)
+		case bool:
+			// true < false
+			return aval.(bool) && !bval.(bool)
 		}
 		return false
 	}
@@ -285,17 +350,20 @@ func (s *MockServer) RunQuery(req *pb.RunQueryRequest, qs pb.Firestore_RunQueryS
 // BeginTransaction overrides the FirestoreServer BeginTransaction method
 func (s *MockServer) BeginTransaction(ctx context.Context, req *pb.BeginTransactionRequest) (*pb.BeginTransactionResponse, error) {
 	// TODO
+	fmt.Println("BeginTransaction")
 	return nil, nil
 }
 
 // Rollback overrides the FirestoreServer Rollback method
 func (s *MockServer) Rollback(ctx context.Context, req *pb.RollbackRequest) (*empty.Empty, error) {
 	// TODO
+	fmt.Println("Rollback")
 	return nil, nil
 }
 
 // Listen overrides the FirestoreServer Listen method
 func (s *MockServer) Listen(stream pb.Firestore_ListenServer) error {
 	// TODO
+	fmt.Print("Listen")
 	return nil
 }

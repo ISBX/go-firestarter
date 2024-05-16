@@ -73,6 +73,28 @@ func (d *document) Get(name string) interface{} {
 	return nil
 }
 
+func (d *document) SetWithValue(name string, value *pb.Value) {
+	switch value := value.GetValueType().(type) {
+	case *pb.Value_IntegerValue:
+		d.fields[name] = value.IntegerValue
+	case *pb.Value_DoubleValue:
+		d.fields[name] = value.DoubleValue
+	case *pb.Value_TimestampValue:
+		// TODO
+		d.fields[name] = value.TimestampValue
+	case *pb.Value_StringValue:
+		d.fields[name] = value.StringValue
+	case *pb.Value_BooleanValue:
+		d.fields[name] = value.BooleanValue
+	case *pb.Value_MapValue:
+		// TODO
+		d.fields[name] = value.MapValue.Fields
+	case *pb.Value_ArrayValue:
+		// TODO
+		d.fields[name] = value.ArrayValue.Values
+	}
+}
+
 func parseCollection(path string, collectionData map[string]interface{}) (*collection, error) {
 	collection := collection{
 		documents: map[string]document{},

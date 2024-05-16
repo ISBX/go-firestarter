@@ -576,3 +576,62 @@ func TestClientWhere_dottedfield(t *testing.T) {
 
 	assert.Len(t, docSnaps, 0)
 }
+
+func TestClientSet(t *testing.T) {
+	// TODO test overwriting an existing document
+	// TODO test creating a new document
+	ctx := context.Background()
+	client, srv, err := New()
+	assert.Nil(t, err)
+	defer srv.Close()
+
+	docRef := client.Doc("collection-1/document-1-1")
+	_, err = docRef.Set(ctx, map[string]interface{}{
+		"field1": "new-value-1-1-1",
+		"field2": "new-value-1-1-2",
+	})
+	assert.Nil(t, err)
+
+	docSnap, err := docRef.Get(ctx)
+	assert.Nil(t, err)
+
+	docData := docSnap.Data()
+	assert.Equal(t, "new-value-1-1-1", docData["field1"])
+	assert.Equal(t, "new-value-1-1-2", docData["field2"])
+}
+
+func TestClientUpdate(t *testing.T) {
+	ctx := context.Background()
+	client, srv, err := New()
+	assert.Nil(t, err)
+	defer srv.Close()
+
+	srv.LoadFromJSONFile("test.json")
+
+	// precondition failure
+	docRef := client.Doc("collection-1/document-xxxxx")
+	_, err = docRef.Update(ctx, []firestore.Update{
+		{
+			Path:  "field2",
+			Value: "new-value-1-1-2",
+		},
+	})
+	assert.NotNil(t, err) // TODO: send proper PreconditionFailure error?
+
+	// successful update
+	docRef = client.Doc("collection-1/document-1-1")
+	_, err = docRef.Update(ctx, []firestore.Update{
+		{
+			Path:  "field2",
+			Value: "new-value-1-1-2",
+		},
+	})
+	assert.Nil(t, err)
+
+	docSnap, err := docRef.Get(ctx)
+	assert.Nil(t, err)
+
+	docData := docSnap.Data()
+	assert.Equal(t, "value-1-1-1", docData["field1"])
+	assert.Equal(t, "new-value-1-1-2", docData["field2"])
+}
