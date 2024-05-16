@@ -22,21 +22,52 @@ type Document struct {
 	fields         map[string]interface{}
 }
 
+func valueToProtoValue(value interface{}) *pb.Value {
+	switch v := value.(type) {
+	case string:
+		return &pb.Value{ValueType: &pb.Value_StringValue{StringValue: v}}
+	case int:
+		return &pb.Value{ValueType: &pb.Value_IntegerValue{IntegerValue: int64(v)}}
+	case float64:
+		return &pb.Value{ValueType: &pb.Value_DoubleValue{DoubleValue: v}}
+	case bool:
+		return &pb.Value{ValueType: &pb.Value_BooleanValue{BooleanValue: v}}
+	case map[string]interface{}:
+		return &pb.Value{ValueType: &pb.Value_MapValue{MapValue: &pb.MapValue{Fields: mapToFields(v)}}}
+	case []interface{}:
+		arrValues := []*pb.Value{}
+		for _, val := range v {
+			pbv := valueToProtoValue(val)
+			arrValues = append(arrValues, pbv)
+		}
+		return &pb.Value{ValueType: &pb.Value_ArrayValue{ArrayValue: &pb.ArrayValue{Values: arrValues}}}
+	}
+	return nil
+}
+
 func mapToFields(mapvals map[string]interface{}) map[string]*pb.Value {
-	// TODO timestamp?
 	fields := map[string]*pb.Value{}
 	for key, value := range mapvals {
-		switch v := value.(type) {
-		case string:
-			fields[key] = &pb.Value{ValueType: &pb.Value_StringValue{StringValue: v}}
-		case int:
-			fields[key] = &pb.Value{ValueType: &pb.Value_IntegerValue{IntegerValue: int64(v)}}
-		case float64:
-			fields[key] = &pb.Value{ValueType: &pb.Value_DoubleValue{DoubleValue: v}}
-		case bool:
-			fields[key] = &pb.Value{ValueType: &pb.Value_BooleanValue{BooleanValue: v}}
-		case map[string]interface{}:
-			fields[key] = &pb.Value{ValueType: &pb.Value_MapValue{MapValue: &pb.MapValue{Fields: mapToFields(v)}}}
+		fields[key] = valueToProtoValue(value)
+	}
+	return fields
+}
+
+func pbMapToMap(mapvals map[string]*pb.Value) map[string]interface{} {
+	// TODO timestamp?
+	fields := map[string]interface{}{}
+	for key, value := range mapvals {
+		switch v := value.GetValueType().(type) {
+		case *pb.Value_StringValue:
+			fields[key] = v.StringValue
+		case *pb.Value_IntegerValue:
+			fields[key] = v.IntegerValue
+		case *pb.Value_DoubleValue:
+			fields[key] = v.DoubleValue
+		case *pb.Value_BooleanValue:
+			fields[key] = v.BooleanValue
+		case *pb.Value_MapValue:
+			fields[key] = pbMapToMap(v.MapValue.Fields)
 		}
 	}
 	return fields
@@ -87,8 +118,7 @@ func (d *Document) SetWithValue(name string, value *pb.Value) {
 	case *pb.Value_BooleanValue:
 		d.fields[name] = value.BooleanValue
 	case *pb.Value_MapValue:
-		// TODO
-		d.fields[name] = value.MapValue.Fields
+		d.fields[name] = pbMapToMap(value.MapValue.Fields)
 	case *pb.Value_ArrayValue:
 		// TODO
 		d.fields[name] = value.ArrayValue.Values

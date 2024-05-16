@@ -22,6 +22,11 @@ func TestClientDocGet(t *testing.T) {
 	docData := docSnap.Data()
 	assert.Equal(t, "value-1-1-1", docData["field1"])
 	assert.Equal(t, "value-1-1-2", docData["field2"])
+	assert.Equal(t, []interface{}{1.0, 2.0, 3.0}, docData["field6"]) // test pb.ArrayValue
+	assert.Equal(t, map[string]interface{}{
+		"subfield1": "subvalue-1-1-1-1",
+		"subfield2": "subvalue-1-1-1-2",
+	}, docData["field7"]) // test pb.MapValue
 
 	docSnap, err = client.Doc("collection-2/document-2-4/subcollection-2-4/subdocument-2-4-2").Get(ctx)
 	assert.Nil(t, err)
@@ -589,6 +594,10 @@ func TestClientSet(t *testing.T) {
 	_, err = docRef.Set(ctx, map[string]interface{}{
 		"field1": "new-value-1-1-1",
 		"field2": "new-value-1-1-2",
+		"field7": map[string]interface{}{
+			"subfield1": "new-subvalue-1-1-1-1",
+			"subfield2": "new-subvalue-1-1-1-2",
+		},
 	})
 	assert.Nil(t, err)
 
@@ -598,6 +607,10 @@ func TestClientSet(t *testing.T) {
 	docData := docSnap.Data()
 	assert.Equal(t, "new-value-1-1-1", docData["field1"])
 	assert.Equal(t, "new-value-1-1-2", docData["field2"])
+	assert.Equal(t, map[string]interface{}{
+		"subfield1": "new-subvalue-1-1-1-1",
+		"subfield2": "new-subvalue-1-1-1-2",
+	}, docData["field7"])
 }
 
 func TestClientUpdate(t *testing.T) {
