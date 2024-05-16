@@ -36,7 +36,7 @@ type MockServer struct {
 	Addr string
 
 	srv      *gsrv.Server
-	data     map[string]collection
+	data     map[string]Collection
 	dataLock sync.RWMutex
 }
 
@@ -49,7 +49,7 @@ func newServer() (*MockServer, error) {
 		Addr: srv.Addr,
 
 		srv:  srv,
-		data: map[string]collection{},
+		data: map[string]Collection{},
 	}
 	pb.RegisterFirestoreServer(srv.Gsrv, mock)
 	srv.Start()
@@ -59,7 +59,7 @@ func newServer() (*MockServer, error) {
 // Reset returns the MockServer to an empty state.
 func (s *MockServer) Reset() {
 	s.dataLock.Lock()
-	s.data = map[string]collection{}
+	s.data = map[string]Collection{}
 	s.dataLock.Unlock()
 }
 

@@ -12,13 +12,13 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-type collection struct {
-	documents map[string]document
+type Collection struct {
+	documents map[string]Document
 }
 
-type document struct {
+type Document struct {
 	name           string
-	subcollections map[string]collection
+	subcollections map[string]Collection
 	fields         map[string]interface{}
 }
 
@@ -42,7 +42,7 @@ func mapToFields(mapvals map[string]interface{}) map[string]*pb.Value {
 	return fields
 }
 
-func (d *document) ToProto(fullPath string) *pb.Document {
+func (d *Document) ToProto(fullPath string) *pb.Document {
 	aTimestamp := timestamppb.Now()
 	doc := &pb.Document{
 		Name:       fullPath,
@@ -54,7 +54,7 @@ func (d *document) ToProto(fullPath string) *pb.Document {
 	return doc
 }
 
-func (d *document) Get(name string) interface{} {
+func (d *Document) Get(name string) interface{} {
 	parts := strings.Split(name, ".")
 
 	current := d.fields
@@ -73,7 +73,7 @@ func (d *document) Get(name string) interface{} {
 	return nil
 }
 
-func (d *document) SetWithValue(name string, value *pb.Value) {
+func (d *Document) SetWithValue(name string, value *pb.Value) {
 	switch value := value.GetValueType().(type) {
 	case *pb.Value_IntegerValue:
 		d.fields[name] = value.IntegerValue
@@ -95,9 +95,9 @@ func (d *document) SetWithValue(name string, value *pb.Value) {
 	}
 }
 
-func parseCollection(path string, collectionData map[string]interface{}) (*collection, error) {
-	collection := collection{
-		documents: map[string]document{},
+func parseCollection(path string, collectionData map[string]interface{}) (*Collection, error) {
+	collection := Collection{
+		documents: map[string]Document{},
 	}
 
 	for documentName, documentData := range collectionData {
@@ -118,10 +118,10 @@ func parseCollection(path string, collectionData map[string]interface{}) (*colle
 	return &collection, nil
 }
 
-func parseDocument(path string, documentData map[string]interface{}) (*document, error) {
-	newDoc := document{
+func parseDocument(path string, documentData map[string]interface{}) (*Document, error) {
+	newDoc := Document{
 		name:           path,
-		subcollections: map[string]collection{},
+		subcollections: map[string]Collection{},
 		fields:         map[string]interface{}{},
 	}
 

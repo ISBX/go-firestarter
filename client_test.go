@@ -578,13 +578,13 @@ func TestClientWhere_dottedfield(t *testing.T) {
 }
 
 func TestClientSet(t *testing.T) {
-	// TODO test overwriting an existing document
-	// TODO test creating a new document
+	// TODO test overwriting an existing document?
 	ctx := context.Background()
 	client, srv, err := New()
 	assert.Nil(t, err)
 	defer srv.Close()
 
+	// create a new doc
 	docRef := client.Doc("collection-1/document-1-1")
 	_, err = docRef.Set(ctx, map[string]interface{}{
 		"field1": "new-value-1-1-1",

@@ -4,7 +4,7 @@ import (
 	pb "google.golang.org/genproto/googleapis/firestore/v1"
 )
 
-func matchFilter(doc document, where *pb.StructuredQuery_Filter) bool {
+func matchFilter(doc Document, where *pb.StructuredQuery_Filter) bool {
 	if where == nil {
 		return true
 	}
@@ -20,7 +20,7 @@ func matchFilter(doc document, where *pb.StructuredQuery_Filter) bool {
 	return false
 }
 
-func matchCompositeFilter(doc document, filter *pb.StructuredQuery_CompositeFilter) bool {
+func matchCompositeFilter(doc Document, filter *pb.StructuredQuery_CompositeFilter) bool {
 	if filter.GetOp() == pb.StructuredQuery_CompositeFilter_AND {
 		for _, filter := range filter.GetFilters() {
 			if filter.GetCompositeFilter() != nil {
@@ -55,7 +55,7 @@ func matchCompositeFilter(doc document, filter *pb.StructuredQuery_CompositeFilt
 	return false
 }
 
-func matchFieldFilter(doc document, filter *pb.StructuredQuery_FieldFilter) bool {
+func matchFieldFilter(doc Document, filter *pb.StructuredQuery_FieldFilter) bool {
 	field := filter.GetField().GetFieldPath()
 	value := filter.GetValue()
 	op := filter.GetOp()

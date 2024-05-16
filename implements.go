@@ -32,6 +32,7 @@ import (
 )
 
 var ErrDocumentNotFound = fmt.Errorf("document not found")
+var ErrCollectionNotFound = fmt.Errorf("collection not found")
 
 func getDocumentPath(fullPath string) string {
 	// `projects/{project_id}/databases/{database_id}/documents/{document_path}`.
@@ -44,7 +45,7 @@ func getDocumentPath(fullPath string) string {
 	return path
 }
 
-func (s *MockServer) getDocumentByPath(path string) (*document, error) {
+func (s *MockServer) getDocumentByPath(path string) (*Document, error) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 2 {
 		return nil, fmt.Errorf("invalid document path: %s", path)
@@ -55,7 +56,7 @@ func (s *MockServer) getDocumentByPath(path string) (*document, error) {
 	}
 
 	// pointer to current document, start at root
-	document := document{
+	document := Document{
 		subcollections: s.data,
 	}
 	for i := 0; i < len(parts); i += 2 {
@@ -64,7 +65,7 @@ func (s *MockServer) getDocumentByPath(path string) (*document, error) {
 		documentId := parts[i+1]
 		collection, ok := document.subcollections[collectionId]
 		if !ok {
-			return nil, fmt.Errorf("collection not found: %s", collectionId)
+			return nil, ErrCollectionNotFound
 		}
 		document, ok = collection.documents[documentId]
 		if !ok {
@@ -75,7 +76,7 @@ func (s *MockServer) getDocumentByPath(path string) (*document, error) {
 	return &document, nil
 }
 
-func (s *MockServer) getCollectionByPath(path string) (*collection, error) {
+func (s *MockServer) getCollectionByPath(path string) (*Collection, error) {
 	parts := strings.Split(path, "/")
 	if len(parts) > 1 && len(parts)%2 == 0 {
 		// should be collectionId/documentId/collectionId/documentId/... and ending in a collectionId
@@ -85,7 +86,7 @@ func (s *MockServer) getCollectionByPath(path string) (*collection, error) {
 	collectionId := parts[len(parts)-1]
 	parts = parts[:len(parts)-1]
 
-	document := &document{
+	document := &Document{
 		subcollections: s.data,
 	}
 
@@ -99,10 +100,49 @@ func (s *MockServer) getCollectionByPath(path string) (*collection, error) {
 
 	collection, ok := document.subcollections[collectionId]
 	if !ok {
-		return nil, fmt.Errorf("collection not found: %s", collectionId)
+		return nil, ErrCollectionNotFound
 	}
 
 	return &collection, nil
+}
+
+func (s *MockServer) newDocumentWithPath(path string) (*Document, error) {
+	parts := strings.Split(path, "/")
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("invalid document path: %s", path)
+	}
+	if len(parts)%2 != 0 {
+		// should be collectionId/documentId/collectionId/documentId/... and ending in a documentId
+		return nil, fmt.Errorf("invalid document path: %s", path)
+	}
+
+	// pointer to current document, start at root
+	d := Document{
+		subcollections: s.data,
+	}
+	for i := 0; i < len(parts); i += 2 {
+		var ok bool
+		collectionId := parts[i]
+		documentId := parts[i+1]
+		c, ok := d.subcollections[collectionId]
+		if !ok {
+			c = Collection{
+				documents: map[string]Document{},
+			}
+			d.subcollections[collectionId] = c
+		}
+		d, ok = c.documents[documentId]
+		if !ok {
+			d = Document{
+				name:           documentId,
+				subcollections: map[string]Collection{},
+				fields:         map[string]interface{}{},
+			}
+			c.documents[documentId] = d
+		}
+	}
+
+	return &d, nil
 }
 
 // GetDocument overrides the FirestoreServer GetDocument method
@@ -141,18 +181,22 @@ func (s *MockServer) Commit(ctx context.Context, req *pb.CommitRequest) (*pb.Com
 		doc, err := s.getDocumentByPath(path)
 		if err != nil {
 			fmt.Println("err", err)
-			if errors.Is(err, ErrDocumentNotFound) {
+			if errors.Is(err, ErrDocumentNotFound) || errors.Is(err, ErrCollectionNotFound) {
+				// Collections are created on the fly so can be missing
 				// if updating a document, then return error if document doesn't exist
 				if write.GetCurrentDocument().GetExists() {
 					return nil, err
 				}
-				doc = &document{
+				doc = &Document{
 					name:           path,
-					subcollections: map[string]collection{},
+					subcollections: map[string]Collection{},
 					fields:         map[string]interface{}{},
 				}
 
-				// TODO add to parent collection
+				doc, err = s.newDocumentWithPath(path)
+				if err != nil {
+					return nil, err
+				}
 			} else {
 				// TODO precondition failed error
 				return &pb.CommitResponse{}, err
@@ -217,7 +261,7 @@ func (s *MockServer) BatchGetDocuments(req *pb.BatchGetDocumentsRequest, bs pb.F
 	return nil
 }
 
-func lessThan(a document, b document, field string, direction pb.StructuredQuery_Direction) bool {
+func lessThan(a Document, b Document, field string, direction pb.StructuredQuery_Direction) bool {
 	// TODO support Arrays, Map (existing types)
 	// https://firebase.google.com/docs/firestore/manage-data/data-types#data_types
 	aval := a.Get(field)
@@ -269,7 +313,7 @@ func (s *MockServer) RunQuery(req *pb.RunQueryRequest, qs pb.Firestore_RunQueryS
 	}
 
 	// filter documents in collection
-	filteredDocs := []document{}
+	filteredDocs := []Document{}
 
 	where := squery.GetWhere()
 	for _, doc := range collection.documents {
