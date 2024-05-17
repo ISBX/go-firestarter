@@ -35,6 +35,13 @@ import (
 var ErrDocumentNotFound = fmt.Errorf("document not found")
 var ErrCollectionNotFound = fmt.Errorf("collection not found")
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func getDocumentPath(fullPath string) string {
 	// `projects/{project_id}/databases/{database_id}/documents/{document_path}`.
 	parts := strings.Split(fullPath, "/")
@@ -262,45 +269,47 @@ func (s *MockServer) BatchGetDocuments(req *pb.BatchGetDocumentsRequest, bs pb.F
 	return nil
 }
 
-func lessThan(a Document, b Document, field string, direction pb.StructuredQuery_Direction) bool {
-	// TODO support Arrays, Map (existing types)
+func lessThanVal(aval, bval interface{}) bool {
+	// TODO support Map (any other existing types?)
 	// https://firebase.google.com/docs/firestore/manage-data/data-types#data_types
+	switch aval.(type) {
+	case string:
+		return aval.(string) < bval.(string)
+	case int:
+		return aval.(int) < bval.(int)
+	case float64:
+		return aval.(float64) < bval.(float64)
+	case bool:
+		// false < true
+		return !aval.(bool) && bval.(bool)
+	case time.Time:
+		return aval.(time.Time).Before(bval.(time.Time))
+	case []byte:
+		return string(aval.([]byte)) < string(bval.([]byte))
+	case []interface{}:
+		aArr := aval.([]interface{})
+		bArr := bval.([]interface{})
+		alen := len(aArr)
+		blen := len(bArr)
+		len := min(alen, blen)
+		for i := 0; i < len; i++ {
+			if lessThanVal(aArr[0], bArr[0]) {
+				return true
+			} else if lessThanVal(bArr[0], aArr[0]) {
+				return false
+			}
+		}
+	}
+	return false
+}
+
+func lessThan(a Document, b Document, field string, direction pb.StructuredQuery_Direction) bool {
 	aval := a.Get(field)
 	bval := b.Get(field)
 	if direction == pb.StructuredQuery_ASCENDING {
-		switch aval.(type) {
-		case string:
-			return aval.(string) < bval.(string)
-		case int:
-			return aval.(int) < bval.(int)
-		case float64:
-			return aval.(float64) < bval.(float64)
-		case bool:
-			// false < true
-			return !aval.(bool) && bval.(bool)
-		case time.Time:
-			return aval.(time.Time).Before(bval.(time.Time))
-		case []byte:
-			return string(aval.([]byte)) < string(bval.([]byte))
-		}
-		return false
+		return lessThanVal(aval, bval)
 	} else if direction == pb.StructuredQuery_DESCENDING {
-		switch aval.(type) {
-		case string:
-			return aval.(string) > bval.(string)
-		case int:
-			return aval.(int) > bval.(int)
-		case float64:
-			return aval.(float64) > bval.(float64)
-		case bool:
-			// true < false
-			return aval.(bool) && !bval.(bool)
-		case time.Time:
-			return aval.(time.Time).After(bval.(time.Time))
-		case []byte:
-			return string(aval.([]byte)) > string(bval.([]byte))
-		}
-		return false
+		return lessThanVal(bval, aval)
 	}
 	// shouldn't get here?
 	return false
