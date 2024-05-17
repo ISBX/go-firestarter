@@ -83,6 +83,8 @@ func matchValue(value interface{}, op pb.StructuredQuery_FieldFilter_Operator, f
 		return matchBoolValue(v, op, filterValue)
 	case time.Time:
 		return matchTimeValue(v, op, filterValue)
+	case []byte:
+		return matchBytesValue(v, op, filterValue)
 	case []interface{}:
 		return matchArrayValue(v, op, filterValue)
 	}
@@ -261,6 +263,37 @@ func matchTimeValue(value time.Time, op pb.StructuredQuery_FieldFilter_Operator,
 	case pb.StructuredQuery_FieldFilter_NOT_IN:
 		for _, ref := range filterValue.GetArrayValue().Values {
 			if value.Equal(ref.GetTimestampValue().AsTime()) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+func matchBytesValue(value []byte, op pb.StructuredQuery_FieldFilter_Operator, filterValue *pb.Value) bool {
+	switch op {
+	case pb.StructuredQuery_FieldFilter_EQUAL:
+		return string(value) == string(filterValue.GetBytesValue())
+	case pb.StructuredQuery_FieldFilter_LESS_THAN:
+		return string(value) < string(filterValue.GetBytesValue())
+	case pb.StructuredQuery_FieldFilter_LESS_THAN_OR_EQUAL:
+		return string(value) <= string(filterValue.GetBytesValue())
+	case pb.StructuredQuery_FieldFilter_GREATER_THAN:
+		return string(value) > string(filterValue.GetBytesValue())
+	case pb.StructuredQuery_FieldFilter_GREATER_THAN_OR_EQUAL:
+		return string(value) >= string(filterValue.GetBytesValue())
+	case pb.StructuredQuery_FieldFilter_NOT_EQUAL:
+		return string(value) != string(filterValue.GetBytesValue())
+	case pb.StructuredQuery_FieldFilter_IN:
+		for _, ref := range filterValue.GetArrayValue().Values {
+			if string(value) == string(ref.GetBytesValue()) {
+				return true
+			}
+		}
+	case pb.StructuredQuery_FieldFilter_NOT_IN:
+		for _, ref := range filterValue.GetArrayValue().Values {
+			if string(value) == string(ref.GetBytesValue()) {
 				return false
 			}
 		}

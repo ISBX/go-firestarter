@@ -280,6 +280,8 @@ func lessThan(a Document, b Document, field string, direction pb.StructuredQuery
 			return !aval.(bool) && bval.(bool)
 		case time.Time:
 			return aval.(time.Time).Before(bval.(time.Time))
+		case []byte:
+			return string(aval.([]byte)) < string(bval.([]byte))
 		}
 		return false
 	} else if direction == pb.StructuredQuery_DESCENDING {
@@ -295,6 +297,8 @@ func lessThan(a Document, b Document, field string, direction pb.StructuredQuery
 			return aval.(bool) && !bval.(bool)
 		case time.Time:
 			return aval.(time.Time).After(bval.(time.Time))
+		case []byte:
+			return string(aval.([]byte)) > string(bval.([]byte))
 		}
 		return false
 	}

@@ -28,7 +28,9 @@ func TestClientDocGet(t *testing.T) {
 		"subfield1": "subvalue-1-1-1-1",
 		"subfield2": "subvalue-1-1-1-2",
 	}, docData["field7"]) // test pb.MapValue
+	assert.Equal(t, []byte("1234567890"), docData["field9"]) // test pb.BytesValue
 
+	// test subcollection/subdocument
 	docSnap, err = client.Doc("collection-2/document-2-4/subcollection-2-4/subdocument-2-4-2").Get(ctx)
 	assert.Nil(t, err)
 
@@ -114,6 +116,22 @@ func TestClientOrderBy(t *testing.T) {
 
 	// test timestamp field asc
 	docSnaps, err = client.Collection("collection-1").OrderBy("field8", firestore.Asc).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+	assert.Equal(t, "document-1-1", docSnaps[0].Ref.ID)
+	assert.Equal(t, "document-1-2", docSnaps[1].Ref.ID)
+
+	// test bytes field desc
+	docSnaps, err = client.Collection("collection-1").OrderBy("field9", firestore.Desc).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+	assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
+	assert.Equal(t, "document-1-1", docSnaps[1].Ref.ID)
+
+	// test bytes field asc
+	docSnaps, err = client.Collection("collection-1").OrderBy("field9", firestore.Asc).Documents(ctx).GetAll()
 	assert.Nil(t, err)
 
 	assert.Len(t, docSnaps, 2)
@@ -543,6 +561,89 @@ func TestClientWhere_timestamp(t *testing.T) {
 	assert.Len(t, docSnaps, 2)
 }
 
+func TestClientWhere_bytes(t *testing.T) {
+	ctx := context.Background()
+	client, srv, err := New()
+	assert.Nil(t, err)
+	defer srv.Close()
+
+	srv.LoadFromJSONFile("test.json")
+
+	// test ==
+	docSnaps, err := client.Collection("collection-1").Where("field9", "==", []byte("1234567890")).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-1", docSnaps[0].Ref.ID)
+
+	// test <
+	docSnaps, err = client.Collection("collection-1").Where("field9", "<", []byte("1234567890")).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 0)
+
+	// test <=
+	docSnaps, err = client.Collection("collection-1").Where("field9", "<=", []byte("1234567890")).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-1", docSnaps[0].Ref.ID)
+
+	// test >
+	docSnaps, err = client.Collection("collection-1").Where("field9", ">", []byte("1234567890")).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
+
+	// test >=
+	docSnaps, err = client.Collection("collection-1").Where("field9", ">=", []byte("1234567890")).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+
+	// test !=
+	docSnaps, err = client.Collection("collection-1").Where("field9", "!=", []byte("1234567890")).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
+
+	// test in
+	docSnaps, err = client.Collection("collection-1").Where("field9", "in", [][]byte{[]byte("1234567890"), []byte("ABCDEFG")}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+
+	docSnaps, err = client.Collection("collection-1").Where("field9", "in", [][]byte{[]byte("1234567890"), []byte("xxxx")}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-1", docSnaps[0].Ref.ID)
+
+	docSnaps, err = client.Collection("collection-1").Where("field9", "in", [][]byte{[]byte("xxxx"), []byte("yyyy")}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 0)
+
+	// test not-in
+	docSnaps, err = client.Collection("collection-1").Where("field9", "not-in", [][]byte{[]byte("1234567890"), []byte("ABCDEFG")}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 0)
+
+	docSnaps, err = client.Collection("collection-1").Where("field9", "not-in", [][]byte{[]byte("1234567890"), []byte("xxxx")}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
+
+	docSnaps, err = client.Collection("collection-1").Where("field9", "not-in", [][]byte{[]byte("xxxx"), []byte("yyyy")}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+}
+
 func TestClientWhere_array(t *testing.T) {
 	ctx := context.Background()
 	client, srv, err := New()
@@ -704,6 +805,7 @@ func TestClientSet(t *testing.T) {
 			"subfield2": "new-subvalue-1-1-1-2",
 		},
 		"field8": jan1,
+		"field9": []byte("1234567890abc"),
 	})
 	assert.Nil(t, err)
 
@@ -718,6 +820,7 @@ func TestClientSet(t *testing.T) {
 		"subfield2": "new-subvalue-1-1-1-2",
 	}, docData["field7"])
 	assert.Equal(t, jan1, docData["field8"])
+	assert.Equal(t, []byte("1234567890abc"), docData["field9"])
 }
 
 func TestClientUpdate(t *testing.T) {

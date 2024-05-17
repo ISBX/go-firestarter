@@ -5,6 +5,7 @@
 package mockfs
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strings"
 	"time"
@@ -35,6 +36,8 @@ func valueToProtoValue(value interface{}) *pb.Value {
 		return &pb.Value{ValueType: &pb.Value_BooleanValue{BooleanValue: v}}
 	case time.Time:
 		return &pb.Value{ValueType: &pb.Value_TimestampValue{TimestampValue: timestamppb.New(v)}}
+	case []byte:
+		return &pb.Value{ValueType: &pb.Value_BytesValue{BytesValue: v}}
 	case map[string]interface{}:
 		return &pb.Value{ValueType: &pb.Value_MapValue{MapValue: &pb.MapValue{Fields: mapToFields(v)}}}
 	case []interface{}:
@@ -70,6 +73,8 @@ func pbMapToMap(mapvals map[string]*pb.Value) map[string]interface{} {
 			fields[key] = v.BooleanValue
 		case *pb.Value_TimestampValue:
 			fields[key] = v.TimestampValue.AsTime()
+		case *pb.Value_BytesValue:
+			fields[key] = v.BytesValue
 		case *pb.Value_MapValue:
 			fields[key] = pbMapToMap(v.MapValue.Fields)
 		}
@@ -120,6 +125,8 @@ func (d *Document) SetWithValue(name string, value *pb.Value) {
 		d.fields[name] = value.StringValue
 	case *pb.Value_BooleanValue:
 		d.fields[name] = value.BooleanValue
+	case *pb.Value_BytesValue:
+		d.fields[name] = value.BytesValue
 	case *pb.Value_MapValue:
 		d.fields[name] = pbMapToMap(value.MapValue.Fields)
 	case *pb.Value_ArrayValue:
@@ -181,11 +188,23 @@ func parseDocument(path string, documentData map[string]interface{}) (*Document,
 				t, err := time.Parse(time.RFC3339, str)
 				if err == nil {
 					value = t
+				} else {
+					if strings.HasPrefix(str, "data:") {
+						// suppport for data URIs
+						prefix, data, found := strings.Cut(str, ",")
+						if found {
+							if strings.HasSuffix(prefix, ";base64") {
+								decoded, err := base64.StdEncoding.DecodeString(data)
+								if err == nil {
+									value = decoded
+								}
+							}
+						}
+					}
 				}
 			}
 			newDoc.fields[key] = value
 		}
 	}
-
 	return &newDoc, nil
 }
