@@ -819,9 +819,11 @@ func TestClientSet(t *testing.T) {
 	_, err = docRef.Set(ctx, map[string]interface{}{
 		"field1": "new-value-1-1-1",
 		"field2": "new-value-1-1-2",
+		"field6": []float64{10.0, 11.0, 12.0},
 		"field7": map[string]interface{}{
 			"subfield1": "new-subvalue-1-1-1-1",
 			"subfield2": "new-subvalue-1-1-1-2",
+			"subfield3": []float64{1.0, 2.0, 3.0},
 		},
 		"field8": jan1,
 		"field9": []byte("1234567890abc"),
@@ -834,9 +836,11 @@ func TestClientSet(t *testing.T) {
 	docData := docSnap.Data()
 	assert.Equal(t, "new-value-1-1-1", docData["field1"])
 	assert.Equal(t, "new-value-1-1-2", docData["field2"])
+	assert.Equal(t, []interface{}{10.0, 11.0, 12.0}, docData["field6"])
 	assert.Equal(t, map[string]interface{}{
 		"subfield1": "new-subvalue-1-1-1-1",
 		"subfield2": "new-subvalue-1-1-1-2",
+		"subfield3": []interface{}{1.0, 2.0, 3.0},
 	}, docData["field7"])
 	assert.Equal(t, jan1, docData["field8"])
 	assert.Equal(t, []byte("1234567890abc"), docData["field9"])

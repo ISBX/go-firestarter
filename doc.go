@@ -77,9 +77,36 @@ func pbMapToMap(mapvals map[string]*pb.Value) map[string]interface{} {
 			fields[key] = v.BytesValue
 		case *pb.Value_MapValue:
 			fields[key] = pbMapToMap(v.MapValue.Fields)
+		case *pb.Value_ArrayValue:
+			fields[key] = pbArrayToSlice(v.ArrayValue.Values)
 		}
 	}
 	return fields
+}
+
+func pbArrayToSlice(arrayvals []*pb.Value) []interface{} {
+	slice := []interface{}{}
+	for _, value := range arrayvals {
+		switch v := value.GetValueType().(type) {
+		case *pb.Value_StringValue:
+			slice = append(slice, v.StringValue)
+		case *pb.Value_IntegerValue:
+			slice = append(slice, v.IntegerValue)
+		case *pb.Value_DoubleValue:
+			slice = append(slice, v.DoubleValue)
+		case *pb.Value_BooleanValue:
+			slice = append(slice, v.BooleanValue)
+		case *pb.Value_TimestampValue:
+			slice = append(slice, v.TimestampValue.AsTime())
+		case *pb.Value_BytesValue:
+			slice = append(slice, v.BytesValue)
+		case *pb.Value_MapValue:
+			slice = append(slice, pbMapToMap(v.MapValue.Fields))
+		case *pb.Value_ArrayValue:
+			slice = append(slice, pbArrayToSlice(v.ArrayValue.Values))
+		}
+	}
+	return slice
 }
 
 func (d *Document) ToProto(fullPath string) *pb.Document {
@@ -130,8 +157,7 @@ func (d *Document) SetWithValue(name string, value *pb.Value) {
 	case *pb.Value_MapValue:
 		d.fields[name] = pbMapToMap(value.MapValue.Fields)
 	case *pb.Value_ArrayValue:
-		// TODO
-		d.fields[name] = value.ArrayValue.Values
+		d.fields[name] = pbArrayToSlice(value.ArrayValue.Values)
 	}
 }
 
