@@ -786,6 +786,25 @@ func TestClientWhere_dottedfield(t *testing.T) {
 	assert.Len(t, docSnaps, 0)
 }
 
+func TestClientWhere_nocollection(t *testing.T) {
+	ctx := context.Background()
+	client, srv, err := New()
+	assert.Nil(t, err)
+	defer srv.Close()
+
+	docSnaps, err := client.Collection("collection-nonexistent").Documents(ctx).GetAll()
+	assert.Nil(t, err)
+	assert.Len(t, docSnaps, 0)
+
+	docSnaps, err = client.Collection("collection-nonexistent").Where("field1", "==", "value-1-1-1").Documents(ctx).GetAll()
+	assert.Nil(t, err)
+	assert.Len(t, docSnaps, 0)
+
+	docSnaps, err = client.Collection("collection-nonexistent/non-existent-doc/sub-collection").Documents(ctx).GetAll()
+	assert.Nil(t, err)
+	assert.Len(t, docSnaps, 0)
+}
+
 func TestClientSet(t *testing.T) {
 	// TODO test overwriting an existing document?
 	ctx := context.Background()

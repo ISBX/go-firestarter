@@ -325,9 +325,13 @@ func (s *MockServer) RunQuery(req *pb.RunQueryRequest, qs pb.Firestore_RunQueryS
 	// get collection
 	collection, err := s.getCollectionByPath(squery.GetFrom()[0].GetCollectionId())
 	if err != nil {
-		// TODO send error
-		// if collection is not found return empty response?
-		return err
+		if errors.Is(err, ErrCollectionNotFound) || errors.Is(err, ErrDocumentNotFound) {
+			collection = &Collection{
+				documents: map[string]Document{},
+			}
+		} else {
+			return err
+		}
 	}
 
 	// filter documents in collection
