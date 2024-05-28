@@ -993,7 +993,6 @@ func TestClientWhere_nocollection(t *testing.T) {
 }
 
 func TestClientSet(t *testing.T) {
-	// TODO test overwriting an existing document?
 	ctx := context.Background()
 	client, srv, err := New()
 	assert.Nil(t, err)
@@ -1031,6 +1030,26 @@ func TestClientSet(t *testing.T) {
 	}, docData["field7"])
 	assert.Equal(t, jan1, docData["field8"])
 	assert.Equal(t, []byte("1234567890abc"), docData["field9"])
+
+	// overwrite an existing doc
+	docRef = client.Doc("collection-1/document-1-1")
+	_, err = docRef.Set(ctx, map[string]interface{}{
+		"field1": "new-value-1-1-1-1",
+		"field2": "new-value-1-1-2-1",
+		"field6": []float64{13.0, 14.0, 15.0},
+		"field7": map[string]interface{}{},
+	})
+	assert.Nil(t, err)
+
+	docSnap, err = docRef.Get(ctx)
+	assert.Nil(t, err)
+
+	docData = docSnap.Data()
+	assert.Equal(t, "new-value-1-1-1-1", docData["field1"])
+	assert.Equal(t, "new-value-1-1-2-1", docData["field2"])
+	assert.Equal(t, []interface{}{13.0, 14.0, 15.0}, docData["field6"])
+	assert.Equal(t, map[string]interface{}{}, docData["field7"])
+	assert.Nil(t, docData["field8"])
 }
 
 func TestClientUpdate(t *testing.T) {

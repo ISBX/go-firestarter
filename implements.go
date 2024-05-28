@@ -71,7 +71,7 @@ func (s *MockServer) getDocumentByPath(path string) (*Document, error) {
 	}
 
 	// pointer to current document, start at root
-	document := Document{
+	document := &Document{
 		subcollections: s.data,
 	}
 	for i := 0; i < len(parts); i += 2 {
@@ -88,7 +88,7 @@ func (s *MockServer) getDocumentByPath(path string) (*Document, error) {
 		}
 	}
 
-	return &document, nil
+	return document, nil
 }
 
 func (s *MockServer) getCollectionByPath(path string) (*Collection, error) {
@@ -132,7 +132,7 @@ func (s *MockServer) newDocumentWithPath(path string) (*Document, error) {
 	}
 
 	// pointer to current document, start at root
-	d := Document{
+	d := &Document{
 		subcollections: s.data,
 	}
 	for i := 0; i < len(parts); i += 2 {
@@ -142,13 +142,13 @@ func (s *MockServer) newDocumentWithPath(path string) (*Document, error) {
 		c, ok := d.subcollections[collectionId]
 		if !ok {
 			c = Collection{
-				documents: map[string]Document{},
+				documents: map[string]*Document{},
 			}
 			d.subcollections[collectionId] = c
 		}
 		d, ok = c.documents[documentId]
 		if !ok {
-			d = Document{
+			d = &Document{
 				name:           documentId,
 				subcollections: map[string]Collection{},
 				fields:         map[string]interface{}{},
@@ -157,7 +157,7 @@ func (s *MockServer) newDocumentWithPath(path string) (*Document, error) {
 		}
 	}
 
-	return &d, nil
+	return d, nil
 }
 
 // GetDocument overrides the FirestoreServer GetDocument method
@@ -180,7 +180,6 @@ func (s *MockServer) GetDocument(ctx context.Context, req *pb.GetDocumentRequest
 
 // Commit overrides the FirestoreServer Commit method
 func (s *MockServer) Commit(ctx context.Context, req *pb.CommitRequest) (*pb.CommitResponse, error) {
-	fmt.Println("Commit") // used for Set?
 	s.dataLock.Lock()
 	defer s.dataLock.Unlock()
 
@@ -191,11 +190,8 @@ func (s *MockServer) Commit(ctx context.Context, req *pb.CommitRequest) (*pb.Com
 	for _, write := range writes {
 		path := getDocumentPath(write.GetUpdate().Name)
 
-		fmt.Println("write", write)
-
 		doc, err := s.getDocumentByPath(path)
 		if err != nil {
-			fmt.Println("err", err)
 			if errors.Is(err, ErrDocumentNotFound) || errors.Is(err, ErrCollectionNotFound) {
 				// Collections are created on the fly so can be missing
 				// if updating a document, then return error if document doesn't exist
@@ -217,18 +213,17 @@ func (s *MockServer) Commit(ctx context.Context, req *pb.CommitRequest) (*pb.Com
 				return &pb.CommitResponse{}, err
 			}
 		}
-		fmt.Println(doc)
 
 		updateMask := write.GetUpdateMask().GetFieldPaths()
-		fmt.Println("updateMask", updateMask)
 		updateFields := write.GetUpdate().GetFields()
 		if len(updateMask) == 0 {
+			// no updateMask, clear all fields and set new ones
+			doc.Clear()
 			for field, value := range updateFields {
 				doc.SetWithValue(field, value)
 			}
 		} else {
 			for _, field := range updateMask {
-				fmt.Println("updating", field, updateFields[field])
 				doc.SetWithValue(field, updateFields[field])
 			}
 		}
@@ -375,7 +370,7 @@ func (s *MockServer) RunQuery(req *pb.RunQueryRequest, qs pb.Firestore_RunQueryS
 	if err != nil {
 		if errors.Is(err, ErrCollectionNotFound) || errors.Is(err, ErrDocumentNotFound) {
 			collection = &Collection{
-				documents: map[string]Document{},
+				documents: map[string]*Document{},
 			}
 		} else {
 			return err
@@ -383,11 +378,11 @@ func (s *MockServer) RunQuery(req *pb.RunQueryRequest, qs pb.Firestore_RunQueryS
 	}
 
 	// filter documents in collection
-	filteredDocs := []Document{}
+	filteredDocs := []*Document{}
 
 	where := squery.GetWhere()
 	for _, doc := range collection.documents {
-		if matchFilter(doc, where) {
+		if matchFilter(*doc, where) {
 			filteredDocs = append(filteredDocs, doc)
 		}
 	}
@@ -412,9 +407,9 @@ func (s *MockServer) RunQuery(req *pb.RunQueryRequest, qs pb.Firestore_RunQueryS
 					}
 				}
 			} else {
-				if lessThan(filteredDocs[i], filteredDocs[j], field, orderBy.GetDirection()) {
+				if lessThan(*filteredDocs[i], *filteredDocs[j], field, orderBy.GetDirection()) {
 					return true
-				} else if lessThan(filteredDocs[j], filteredDocs[i], field, orderBy.GetDirection()) {
+				} else if lessThan(*filteredDocs[j], *filteredDocs[i], field, orderBy.GetDirection()) {
 					return false
 				}
 			}

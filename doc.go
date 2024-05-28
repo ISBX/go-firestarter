@@ -15,7 +15,7 @@ import (
 )
 
 type Collection struct {
-	documents map[string]Document
+	documents map[string]*Document
 }
 
 type Document struct {
@@ -140,6 +140,10 @@ func (d *Document) Get(name string) interface{} {
 	return current
 }
 
+func (d *Document) Clear() {
+	d.fields = map[string]interface{}{}
+}
+
 func (d *Document) SetWithValue(name string, value *pb.Value) {
 	switch value := value.GetValueType().(type) {
 	case *pb.Value_IntegerValue:
@@ -163,7 +167,7 @@ func (d *Document) SetWithValue(name string, value *pb.Value) {
 
 func parseCollection(path string, collectionData map[string]interface{}) (*Collection, error) {
 	collection := Collection{
-		documents: map[string]Document{},
+		documents: map[string]*Document{},
 	}
 
 	for documentName, documentData := range collectionData {
@@ -175,7 +179,7 @@ func parseCollection(path string, collectionData map[string]interface{}) (*Colle
 		if err != nil {
 			return nil, err
 		}
-		collection.documents[documentName] = *newDoc
+		collection.documents[documentName] = newDoc
 		if !ok {
 			return nil, fmt.Errorf("document %v data is not a map: %v", documentName, documentData)
 		}
