@@ -137,7 +137,7 @@ func (d *Document) Get(name string) interface{} {
 			return value
 		}
 	}
-	return nil
+	return current
 }
 
 func (d *Document) SetWithValue(name string, value *pb.Value) {

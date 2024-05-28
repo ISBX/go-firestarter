@@ -42,6 +42,13 @@ func min(a, b int) int {
 	return b
 }
 
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 func getDocumentPath(fullPath string) string {
 	// `projects/{project_id}/databases/{database_id}/documents/{document_path}`.
 	parts := strings.Split(fullPath, "/")
@@ -270,8 +277,8 @@ func (s *MockServer) BatchGetDocuments(req *pb.BatchGetDocumentsRequest, bs pb.F
 }
 
 func lessThanVal(aval, bval interface{}) bool {
-	// TODO support Map (any other existing types?)
-	// https://firebase.google.com/docs/firestore/manage-data/data-types#data_types
+	// TODO support other existing types? And "value type ordering"?
+	// https://firebase.google.com/docs/firestore/manage-data/data-types
 	switch aval.(type) {
 	case string:
 		return aval.(string) < bval.(string)
@@ -286,6 +293,47 @@ func lessThanVal(aval, bval interface{}) bool {
 		return aval.(time.Time).Before(bval.(time.Time))
 	case []byte:
 		return string(aval.([]byte)) < string(bval.([]byte))
+	case map[string]interface{}:
+		aMap := aval.(map[string]interface{})
+		bMap := bval.(map[string]interface{})
+		aKeys := []string{}
+		for k := range aMap {
+			aKeys = append(aKeys, k)
+		}
+		sort.Strings(aKeys)
+		bKeys := []string{}
+		for k := range bMap {
+			bKeys = append(bKeys, k)
+		}
+		sort.Strings(bKeys)
+		maxlen := max(len(aKeys), len(bKeys))
+		for i := 0; i < maxlen; i++ {
+			if i >= len(aKeys) {
+				// a is shorter than b
+				return true
+			}
+			if i >= len(bKeys) {
+				// b is shorter than a
+				return false
+			}
+			aKey := aKeys[i]
+			bKey := bKeys[i]
+			if aKey < bKey {
+				return true
+			} else if aKey > bKey {
+				return false
+			}
+			// keys are equal
+
+			if lessThanVal(aMap[aKey], bMap[bKey]) {
+				return true
+			} else if lessThanVal(bMap[bKey], aMap[aKey]) {
+				return false
+			}
+
+			// keys and values are equal, continue to next key
+		}
+
 	case []interface{}:
 		aArr := aval.([]interface{})
 		bArr := bval.([]interface{})

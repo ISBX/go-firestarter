@@ -71,7 +71,6 @@ func matchFieldFilter(doc Document, filter *pb.StructuredQuery_FieldFilter) bool
 }
 
 func matchValue(value interface{}, op pb.StructuredQuery_FieldFilter_Operator, filterValue *pb.Value) bool {
-	// TODO maps
 	switch v := value.(type) {
 	case string:
 		return matchStringValue(v, op, filterValue)
@@ -85,6 +84,8 @@ func matchValue(value interface{}, op pb.StructuredQuery_FieldFilter_Operator, f
 		return matchTimeValue(v, op, filterValue)
 	case []byte:
 		return matchBytesValue(v, op, filterValue)
+	case map[string]interface{}:
+		return matchMapValue(v, op, filterValue)
 	case []interface{}:
 		return matchArrayValue(v, op, filterValue)
 	}
@@ -318,4 +319,49 @@ func matchArrayValue(value []interface{}, op pb.StructuredQuery_FieldFilter_Oper
 		}
 	}
 	return false
+}
+
+func matchMapValue(value map[string]interface{}, op pb.StructuredQuery_FieldFilter_Operator, filterValue *pb.Value) bool {
+	switch op {
+	case pb.StructuredQuery_FieldFilter_EQUAL:
+		return matchMapEqual(value, filterValue.GetMapValue().Fields)
+	case pb.StructuredQuery_FieldFilter_LESS_THAN:
+		return matchMapLessThan(value, filterValue.GetMapValue().Fields)
+	case pb.StructuredQuery_FieldFilter_LESS_THAN_OR_EQUAL:
+		return matchMapEqual(value, filterValue.GetMapValue().Fields) || matchMapLessThan(value, filterValue.GetMapValue().Fields)
+	case pb.StructuredQuery_FieldFilter_GREATER_THAN:
+		return !matchMapEqual(value, filterValue.GetMapValue().Fields) && !matchMapLessThan(value, filterValue.GetMapValue().Fields)
+	case pb.StructuredQuery_FieldFilter_GREATER_THAN_OR_EQUAL:
+		return !matchMapLessThan(value, filterValue.GetMapValue().Fields)
+	case pb.StructuredQuery_FieldFilter_NOT_EQUAL:
+		return !matchMapEqual(value, filterValue.GetMapValue().Fields)
+	case pb.StructuredQuery_FieldFilter_IN:
+		for _, ref := range filterValue.GetArrayValue().Values {
+			if matchMapEqual(value, ref.GetMapValue().Fields) {
+				return true
+			}
+		}
+	case pb.StructuredQuery_FieldFilter_NOT_IN:
+		for _, ref := range filterValue.GetArrayValue().Values {
+			if matchMapEqual(value, ref.GetMapValue().Fields) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+func matchMapEqual(value map[string]interface{}, filter map[string]*pb.Value) bool {
+	for key, filterValue := range filter {
+		if !matchValue(value[key], pb.StructuredQuery_FieldFilter_EQUAL, filterValue) {
+			return false
+		}
+	}
+	return true
+}
+
+func matchMapLessThan(value map[string]interface{}, filter map[string]*pb.Value) bool {
+	m := pbMapToMap(filter)
+	return lessThanVal(value, m)
 }

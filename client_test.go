@@ -138,6 +138,38 @@ func TestClientOrderBy(t *testing.T) {
 	assert.Equal(t, "document-1-1", docSnaps[0].Ref.ID)
 	assert.Equal(t, "document-1-2", docSnaps[1].Ref.ID)
 
+	// test map field desc
+	docSnaps, err = client.Collection("collection-1").OrderBy("field7", firestore.Desc).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+	assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
+	assert.Equal(t, "document-1-1", docSnaps[1].Ref.ID)
+
+	// test map field asc
+	docSnaps, err = client.Collection("collection-1").OrderBy("field7", firestore.Asc).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+	assert.Equal(t, "document-1-1", docSnaps[0].Ref.ID)
+	assert.Equal(t, "document-1-2", docSnaps[1].Ref.ID)
+
+	// test array field desc
+	docSnaps, err = client.Collection("collection-1").OrderBy("field6", firestore.Desc).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+	assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
+	assert.Equal(t, "document-1-1", docSnaps[1].Ref.ID)
+
+	// test array field asc
+	docSnaps, err = client.Collection("collection-1").OrderBy("field6", firestore.Asc).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+	assert.Equal(t, "document-1-1", docSnaps[0].Ref.ID)
+	assert.Equal(t, "document-1-2", docSnaps[1].Ref.ID)
+
 	// multiple order by, desc
 	docSnaps, err = client.Collection("collection-1").
 		OrderBy("field4", firestore.Desc).
@@ -639,6 +671,161 @@ func TestClientWhere_bytes(t *testing.T) {
 	assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
 
 	docSnaps, err = client.Collection("collection-1").Where("field9", "not-in", [][]byte{[]byte("xxxx"), []byte("yyyy")}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+}
+
+func TestMainWhere_map(t *testing.T) {
+	ctx := context.Background()
+	client, srv, err := New()
+	assert.Nil(t, err)
+	defer srv.Close()
+
+	srv.LoadFromJSONFile("test.json")
+
+	// test ==
+	docSnaps, err := client.Collection("collection-1").Where("field7", "==", map[string]interface{}{
+		"subfield1": "subvalue-1-1-1-1",
+		"subfield2": "subvalue-1-1-1-2",
+	}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-1", docSnaps[0].Ref.ID)
+
+	// test <
+	docSnaps, err = client.Collection("collection-1").Where("field7", "<", map[string]interface{}{
+		"subfield1": "subvalue-1-2-1-1",
+		"subfield2": "subvalue-1-2-1-2",
+	}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-1", docSnaps[0].Ref.ID)
+
+	// test <=
+	docSnaps, err = client.Collection("collection-1").Where("field7", "<=", map[string]interface{}{
+		"subfield1": "subvalue-1-2-1-1",
+		"subfield2": "subvalue-1-2-2-2",
+	}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+
+	// test >
+	docSnaps, err = client.Collection("collection-1").Where("field7", ">", map[string]interface{}{
+		"subfield1": "subvalue-1-1-1-1",
+		"subfield2": "subvalue-1-1-2-1",
+	}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
+
+	// test >=
+	docSnaps, err = client.Collection("collection-1").Where("field7", ">=", map[string]interface{}{
+		"subfield1": "subvalue-1-1-1-1",
+		"subfield2": "subvalue-1-1-1-2",
+	}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+
+	// test !=
+	docSnaps, err = client.Collection("collection-1").Where("field7", "!=", map[string]interface{}{
+		"subfield1": "subvalue-1-1-1-1",
+		"subfield2": "subvalue-1-1-1-2",
+	}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
+
+	// test in
+	docSnaps, err = client.Collection("collection-1").Where("field7", "in", []map[string]interface{}{
+		{
+			"subfield1": "subvalue-1-1-1-1",
+			"subfield2": "subvalue-1-1-1-2",
+		},
+		{
+			"subfield1": "subvalue-1-2-1-1",
+			"subfield2": "subvalue-1-2-1-2",
+		},
+	}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+
+	docSnaps, err = client.Collection("collection-1").Where("field7", "in", []map[string]interface{}{
+		{
+			"subfield1": "subvalue-1-1-1-1",
+			"subfield2": "subvalue-1-1-1-2",
+		},
+		{
+			"subfield1": "xxxx",
+			"subfield2": "yyyy",
+		},
+	}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-1", docSnaps[0].Ref.ID)
+
+	docSnaps, err = client.Collection("collection-1").Where("field7", "in", []map[string]interface{}{
+		{
+			"subfield1": "xxxx",
+			"subfield2": "yyyy",
+		},
+		{
+			"subfield1": "zzzz",
+			"subfield2": "aaaa",
+		},
+	}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 0)
+
+	// test not-in
+	docSnaps, err = client.Collection("collection-1").Where("field7", "not-in", []map[string]interface{}{
+		{
+			"subfield1": "subvalue-1-1-1-1",
+			"subfield2": "subvalue-1-1-1-2",
+		},
+		{
+			"subfield1": "subvalue-1-2-1-1",
+			"subfield2": "subvalue-1-2-1-2",
+		},
+	}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 0)
+
+	docSnaps, err = client.Collection("collection-1").Where("field7", "not-in", []map[string]interface{}{
+		{
+			"subfield1": "subvalue-1-1-1-1",
+			"subfield2": "subvalue-1-1-1-2",
+		},
+		{
+			"subfield1": "xxxx",
+			"subfield2": "yyyy",
+		},
+	}).Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
+
+	docSnaps, err = client.Collection("collection-1").Where("field7", "not-in", []map[string]interface{}{
+		{
+			"subfield1": "xxxx",
+			"subfield2": "yyyy",
+		},
+		{
+			"subfield1": "zzzz",
+			"subfield2": "aaaa",
+		},
+	}).Documents(ctx).GetAll()
 	assert.Nil(t, err)
 
 	assert.Len(t, docSnaps, 2)
