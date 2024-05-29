@@ -7,6 +7,8 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestClientDocGet(t *testing.T) {
@@ -1068,7 +1070,7 @@ func TestClientUpdate(t *testing.T) {
 			Value: "new-value-1-1-2",
 		},
 	})
-	assert.NotNil(t, err) // TODO: send proper PreconditionFailure error?
+	assert.Equal(t, codes.NotFound, status.Code(err))
 
 	// successful update
 	docRef = client.Doc("collection-1/document-1-1")

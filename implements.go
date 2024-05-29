@@ -28,12 +28,14 @@ import (
 	"time"
 
 	pb "google.golang.org/genproto/googleapis/firestore/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-var ErrDocumentNotFound = fmt.Errorf("document not found")
-var ErrCollectionNotFound = fmt.Errorf("collection not found")
+var ErrDocumentNotFound = status.Error(codes.NotFound, "document not found")
+var ErrCollectionNotFound = status.Error(codes.NotFound, "collection not found")
 
 func min(a, b int) int {
 	if a < b {
@@ -209,8 +211,7 @@ func (s *MockServer) Commit(ctx context.Context, req *pb.CommitRequest) (*pb.Com
 					return nil, err
 				}
 			} else {
-				// TODO precondition failed error
-				return &pb.CommitResponse{}, err
+				return nil, err
 			}
 		}
 
