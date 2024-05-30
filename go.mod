@@ -1,4 +1,4 @@
-module github.com/weathersource/go-mockfs
+module github.com/ISBX/go-firestarter
 
 go 1.21.0
 

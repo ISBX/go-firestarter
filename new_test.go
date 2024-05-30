@@ -1,4 +1,4 @@
-package mockfs
+package firestarter
 
 // func TestNew(t *testing.T) {
 // 	client, server, err := New()

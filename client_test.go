@@ -1,4 +1,4 @@
-package mockfs
+package firestarter
 
 import (
 	"context"
