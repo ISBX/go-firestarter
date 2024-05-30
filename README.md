@@ -37,7 +37,7 @@ An example:
 	assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
 ```
 
-### func (s *MockServer) LoadFromJSONFile(filePath string)
+#### `func (s *MockServer) LoadFromJSONFile(filePath string) error`
 Since JSON types only cover a subset of Firestore types, `LoadFromJSONFile` will parse strings for Timestamps and Bytes.
 * If the string is a RFC3339 (https://pkg.go.dev/time#pkg-constants), the value will be stored as a `time.Time` internally and returned as a `pb.Value_TimestampValue`.
 * If the string is a data URL, the value will be stored as a `[]byte` and returned as a `pb.Value_BytesValue`.
