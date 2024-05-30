@@ -23,18 +23,18 @@
 
 An example:
 ```
-	ctx := context.Background()
-	client, srv, err := New()
-	assert.Nil(t, err)
-	defer srv.Close()
+ctx := context.Background()
+client, srv, err := New()
+assert.Nil(t, err)
+defer srv.Close()
 
-	srv.LoadFromJSONFile("test.json")
+srv.LoadFromJSONFile("test.json")
 
-	docSnaps, err := client.Collection("collection-1").Where("field1", "==", "value-1-2-1").Documents(ctx).GetAll()
-	assert.Nil(t, err)
+docSnaps, err := client.Collection("collection-1").Where("field1", "==", "value-1-2-1").Documents(ctx).GetAll()
+assert.Nil(t, err)
 
-	assert.Len(t, docSnaps, 1)
-	assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
+assert.Len(t, docSnaps, 1)
+assert.Equal(t, "document-1-2", docSnaps[0].Ref.ID)
 ```
 
 #### `func (s *MockServer) LoadFromJSONFile(filePath string) error`
