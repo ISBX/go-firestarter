@@ -4,9 +4,10 @@
 
 `go-firestarter` was forked from `go-mockfs` (https://github.com/weathersource/go-mockfs). `go-mockfs` is a low level mock for Google Firestore matching the request's protobuf message and returning a response protofbuf message. `go-firestarter` differs by implementing the logic for creating/updating documents and querying.
 
-## Currently Missing Functionality
+## Missing Functionality
 * NULL/NaN value handling
-* Order By with different types
+* Order By on field with different types between documents
+  * https://firebase.google.com/docs/firestore/manage-data/data-types#value_type_ordering
 * Order By existence
   * https://firebase.google.com/docs/firestore/query-data/order-limit-data#limitations
 * Various limitations/edge-cases
