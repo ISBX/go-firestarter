@@ -886,6 +886,34 @@ func TestClientWhere_array(t *testing.T) {
 
 }
 
+func TestClientAnd(t *testing.T) {
+	ctx := context.Background()
+	client, srv, err := New()
+	assert.Nil(t, err)
+	defer srv.Close()
+
+	srv.LoadFromJSONFile("test.json")
+
+	docSnaps, err := client.Collection("collection-1").
+		Where("field1", "==", "value-1-1-1").
+		Where("field2", "==", "value-1-1-2").
+		Where("field3", "==", 113).
+		Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 1)
+	assert.Equal(t, "document-1-1", docSnaps[0].Ref.ID)
+
+	docSnaps, err = client.Collection("collection-1").
+		Where("field1", "==", "value-1-1-1").
+		Where("field2", "==", "value-1-1-2").
+		Where("field3", "==", 0).
+		Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 0)
+}
+
 func TestClientWhereOr(t *testing.T) {
 	ctx := context.Background()
 	client, srv, err := New()
