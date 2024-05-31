@@ -51,7 +51,7 @@ func max(a, b int) int {
 	return b
 }
 
-func getDocumentPath(fullPath string) string {
+func stripPrefix(fullPath string) string {
 	// `projects/{project_id}/databases/{database_id}/documents/{document_path}`.
 	parts := strings.Split(fullPath, "/")
 	if len(parts) < 6 {
@@ -94,6 +94,7 @@ func (s *MockServer) getDocumentByPath(path string) (*Document, error) {
 }
 
 func (s *MockServer) getCollectionByPath(path string) (*Collection, error) {
+	path = stripPrefix(path)
 	parts := strings.Split(path, "/")
 	if len(parts) > 1 && len(parts)%2 == 0 {
 		// should be collectionId/documentId/collectionId/documentId/... and ending in a collectionId
@@ -171,7 +172,7 @@ func (s *MockServer) GetDocument(ctx context.Context, req *pb.GetDocumentRequest
 	defer s.dataLock.RUnlock()
 
 	// `projects/{project_id}/databases/{database_id}/documents/{document_path}`.
-	path := getDocumentPath(req.GetName())
+	path := stripPrefix(req.GetName())
 	document, err := s.getDocumentByPath(path)
 	if err != nil {
 		return nil, err
@@ -190,7 +191,7 @@ func (s *MockServer) Commit(ctx context.Context, req *pb.CommitRequest) (*pb.Com
 	responses := []*pb.WriteResult{}
 
 	for _, write := range writes {
-		path := getDocumentPath(write.GetUpdate().Name)
+		path := stripPrefix(write.GetUpdate().Name)
 
 		doc, err := s.getDocumentByPath(path)
 		if err != nil {
@@ -243,7 +244,7 @@ func (s *MockServer) BatchGetDocuments(req *pb.BatchGetDocumentsRequest, bs pb.F
 	s.dataLock.RLock()
 	defer s.dataLock.RUnlock()
 	for _, docId := range req.Documents {
-		path := getDocumentPath(docId)
+		path := stripPrefix(docId)
 		document, err := s.getDocumentByPath(path)
 		if err != nil {
 			readTime := timestamppb.Now()
@@ -366,8 +367,9 @@ func (s *MockServer) RunQuery(req *pb.RunQueryRequest, qs pb.Firestore_RunQueryS
 
 	squery := req.GetStructuredQuery()
 
+	path := req.Parent + "/" + squery.GetFrom()[0].GetCollectionId()
 	// get collection
-	collection, err := s.getCollectionByPath(squery.GetFrom()[0].GetCollectionId())
+	collection, err := s.getCollectionByPath(path)
 	if err != nil {
 		if errors.Is(err, ErrCollectionNotFound) || errors.Is(err, ErrDocumentNotFound) {
 			collection = &Collection{

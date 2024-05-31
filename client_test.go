@@ -60,12 +60,21 @@ func TestClientDocGetAll(t *testing.T) {
 
 	srv.LoadFromJSONFile("test.json")
 
+	// get from a top level collection
 	docSnaps, err := client.Collection("collection-1").Documents(ctx).GetAll()
 	assert.Nil(t, err)
 
 	assert.Len(t, docSnaps, 2)
 	assert.Equal(t, "document-1-1", docSnaps[0].Ref.ID)
 	assert.Equal(t, "document-1-2", docSnaps[1].Ref.ID)
+
+	// get from a subcollection
+	docSnaps, err = client.Collection("collection-2/document-2-4/subcollection-2-4").Documents(ctx).GetAll()
+	assert.Nil(t, err)
+
+	assert.Len(t, docSnaps, 2)
+	assert.Equal(t, "subdocument-2-4-1", docSnaps[0].Ref.ID)
+	assert.Equal(t, "subdocument-2-4-2", docSnaps[1].Ref.ID)
 }
 
 func TestClientOrderBy(t *testing.T) {
